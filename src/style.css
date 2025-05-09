@@ -34,6 +34,14 @@ h1 {
   font-size: 3.2em;
   line-height: 1.1;
 }
+.completed{
+  text-decoration : line-through;
+  color : gray;
+}
+ul{
+  list-style :none;
+  padding:0;
+}
 
 button {
   border-radius: 8px;
@@ -54,9 +62,6 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-.card {
-  padding: 2em;
-}
 
 #app {
   max-width: 1280px;
