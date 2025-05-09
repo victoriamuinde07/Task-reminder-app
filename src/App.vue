@@ -1,26 +1,40 @@
 <script setup>
-import {ref,computed,watchEffect} from 'vue';
+import {ref,computed,watchEffect,onMounted} from 'vue';
 import TaskForm from "./components/TaskForm.vue";
 import TaskList from "./components/TaskList.vue";
+import StickyNote from "./components/StickyNote.vue";
 
 
-export default {
-  components: { TaskForm, TaskList},
-  data() {
-    return{
-      tasks: JSON.parse(localStorage.getItem("tasks")) || [],
-      theme: "light",
-    };
-  },
-  methods: {
-    toggleTheme() {
-      this.theme = this.theme === "light" ? "dark" : "light";
-    },
-}
-const tasks = ref(JSON.parse(localStorage.getItem('tasks')) || []);
-const saveTasks = () => {
-  localStorage.setItem("tasks", JSON.stringify(tasks.value));
+const theme = ref(localStorage.getItem("theme") || "light");
+const toggleTheme = () => {
+  theme.value = theme.value === "light" ? "dark" : "light";
+  localStorage.setItem("theme", theme.value);
 };
+const activeAlarmTimeouts = ref(new Map());
+const requestNotificationPermission = () => {
+  if('Notification' in window) {
+    Notification.requestPermission().then(permission => {
+      if (permission === 'granted') {
+        console.log('Notification permission granted');
+
+      }else{
+        console.log('Notification permission denied');
+      }
+    });
+  }
+};
+const showBrowserNotification = (taskTest) =>{
+  if ('Notification' in window && Notification.permission === 'granted'){
+    new Notification ("Task Reminder",{body: taskTest});
+  }else if('Notification' in window && Notification.permission !== 'denied'){
+    Notification.requestPermission().then(permission => {
+      if (permission === 'granted') {
+        new Notification("Task reminder",{body:taskText});
+      }
+    });
+  }
+};
+const tasks = ref(JSON.parse(localStorage.getItem('tasks')) || []);
 watchEffect(() => {
   localStorage.setItem("tasks", JSON.stringify(tasks.value));
 });
@@ -33,63 +47,132 @@ const handleDeleteTask = (index) => {
   tasks.value.splice(index, 1);
 };
 const newTask = ref('');
-const filter = ref('all');
-const addTask = () => {
+const taskDate = ref('');
+const addInlineTask = () => {
   if (newTask.value.trim() === '') return;
-  tasks.value.push({ text: newTask.value, completed: false,alarmTime: null });
+  tasks.value.push({
+    text: newTask.value,
+    date: taskDate.value,
+    completed: false,
+    alarmTime: null,
+  });
   newTask.value = '';
+  taskDate.value = '';
 };
-const deleteTask = (index) => {
+const deleteInlineTask = (index) => {
   tasks.value.splice(index, 1);
 };
-const filteredTasks = computed(() => {
-  if (filter.value === 'all') {
-    return tasks.value;
-  } else if (filter.value === 'active') {
-    return tasks.value.filter((task) => !task.completed);
-  } else {
-    return tasks.value.filter((task) => task.completed);
-  }
-});
 const editTask = (index) => {
-  const taskToEdit = filteredTasks.value[index];
-  const originalTaskIndex = tasks.value.findIndex(t => t === taskToEdit );
-  const updatedText = prompt('Edit task:', taskToEdit.text);
+  const taskToEdit = filteredTasksForInlineList.value[index];
+  const originalTaskIndex = tasks.value.findIndex(t => t === taskToEdit);
+
+  if (originalTaskIndex === -1) return; // Should not happen
+
+  const updatedText = prompt('Edit task:', tasks.value[originalTaskIndex].text);
   if (updatedText !== null && updatedText.trim() !== ''){
     tasks.value[originalTaskIndex].text = updatedText.trim();
   } 
 };
 
-</script>
+const currentTab = ref('all'); 
+const TABS = ['all','active','completed'];
 
+const filteredTasks = computed(() => { 
+  if (currentTab.value === 'active') return tasks.value.filter(t => !t.completed);
+  if (currentTab.value === 'completed') return tasks.value.filter(t => t.completed);
+  return tasks.value;
+});
+const filteredTasksForInlineList = computed(() => {
+  if (currentTab.value === 'active') return tasks.value.filter(t => !t.completed);
+  if (currentTab.value === 'completed') return tasks.value.filter(t => t.completed);
+  return tasks.value;
+});
+const toggleComplete = (task) => { // Pass the actual task object
+  const taskInArray = tasks.value.find(t => t === task);
+  if (taskInArray) {
+    taskInArray.completed = !taskInArray.completed;
+  }
+};
+
+// --- Sticky Notes ---
+const stickyNotes = ref(JSON.parse(localStorage.getItem('stickyNotes')) || []);
+watchEffect(() => {
+  localStorage.setItem('stickyNotes', JSON.stringify(stickyNotes.value));
+});
+
+const getRandomColor = () => {
+  const colors = ['#ffd700', '#ffb6c1', '#98fb98', '#add8e6', '#dda0dd'];
+  return colors[Math.floor(Math.random() * colors.length)];
+};
+
+const addStickyNote = () => {
+  stickyNotes.value.push({ text: '', color: getRandomColor() });
+};
+
+const updateNote = (index, text) => {
+  if (stickyNotes.value[index]) {
+    stickyNotes.value[index].text = text;
+  }
+};
+
+const deleteNote = (index) => {
+  stickyNotes.value.splice(index, 1);
+};
+</script>
 
 <template>
   <div id="app" :class="theme">
     <div class="container">
       <header>
-        <h1> ⏰ Task Reminder</h1>
+        <h1> ⏰ Riaor Reminder</h1>
           <button @click="toggleTheme" class="theme-toggle">
             <i :class="theme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon'"></i>
           </button>
       </header>
       <TaskForm @add-task="handleAddTask"/>
-      <TaskList :tasks="tasks" @delete-task="handleDeleteTask"/>
-      <input v-model="newTask" @keyup.enter="addTask" placeholder="Add a task" />
-      <button @click="addTask">Add Task</button>
+      
       <ul>
-        <li v-for ="(task,index) in filteredTasks" :key="index">
+        <li v-for ="(task,index) in filteredTasksForInlineList" :key="task.id || index">
           <input type="checkbox" v-model="task.completed" />
           <span :class="{completed: task.completed}">{{ task.text }}</span>
-          <button @click="deleteTask(index)">Delete</button>
+          <button @click="deleteInlineTask(index)">Delete</button>
           <button @click="editTask(index)">Edit</button>
         </li>
       </ul>
-      <div>
-        <button @click="filter = 'all'">All</button>
-        <button @click="filter = 'active'">Active</button>
-        <button @click="filter = 'completed'">Completed</button>
+      <div class="task-tabs">
+        <button 
+        v-for="tab in TABS"
+        :key="tab"
+        @click="currentTab = tab"
+        :class="{ active:currentTab === tab}"
+        >
+          {{tab}}
+        </button>
+      </div>
+      <TaskList 
+      v-if="tasks.length > 0 "
+        :tasks="filteredTasks"
+        @delete-task="handleDeleteTask"
+        @toggle-complete="toggleComplete"
+      />
+      <div class="sticky-notes section">
+        
+        <div class="sticky-notes-section">
+          <div class="sticky-notes-container">
+            <StickyNote 
+          v-for="(note, index) in stickyNotes" 
+          :key="index"
+          :note="note"
+          @update-note="updateNote(index, $event)"
+          @delete-note="deleteNote(index)"
+        />
+        <button @click="addStickyNote" class="add-note-btn">
+          <i class="fas fa-plus"></i> Add Note
+        </button>
       </div>
     </div>
+    </div>
+  </div>
   </div>
 </template>
 
@@ -97,24 +180,26 @@ const editTask = (index) => {
 :root {
   --primary: #42b983;
   --bg: #f9f9f9;
-  --text: #2c3e50;
+  --text: #dae7f5ed;
   --card-bg: #ffffff;
   --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .dark {
   --primary: #42d392;
-  --bg: #1a1a1a;
+  --bg: #b2f2f3;
   --text: #ffffff;
   --card-bg: #2d2d2d;
   --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 #app {
-  min-height: 100vh;
-  background: var(--bg);
-  color: var(--text);
-  transition: background 0.3s ease;
+  max-width: 800px;
+  max-height:100vh;
+  margin: 0 auto;
+  background:rgb(37, 64, 72);
+  padding: 30px;
+  font-family: 'Arial',sans-serif;
 }
 
 .container {
@@ -123,198 +208,64 @@ const editTask = (index) => {
   padding: 2rem;
 }
 
-header {
+header h1 {
   display: flex;
+  color:rgb(72, 96, 133);
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
+  margin-bottom: 20px;
+}
+.task-text-input, .task-date-input {
+  padding: 10px;
+  border: 1px;
+  border-radius: 4px;
+  flex: 1;
+}
+.task-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.task-tabs button {
+  padding: 8px 15px;
+  background: #06070a;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.sticky-notes-section {
+  margin-top: 40px;
+}
+
+
+.sticky-notes-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.add-note-btn {
+  padding: 10px 15px;
+  background: #42b983;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.task-tabs button.active {
+  background: #42b983;
+  color: white;
 }
 
 .theme-toggle {
-  background: none;
+  background:#1a1a1a;
   border: none;
-  color: var(--text);
+  color:rgb(187, 241, 224);
   cursor: pointer;
   font-size: 1.2rem;
 }
 </style>
-Step 3: Enhanced TaskForm.vue
-vue
-<template>
-  <form @submit.prevent="addTask" class="task-form">
-    <div class="input-group">
-      <input 
-        v-model="newTask" 
-        placeholder="What needs to be done?" 
-        class="task-input"
-      />
-      <input
-        type="datetime-local"
-        v-model="alarmTime"
-        class="time-input"
-        :min="new Date().toISOString().slice(0, 16)"
-      />
-      <button type="submit" class="add-btn">
-        <i class="fas fa-plus"></i> Add Task
-      </button>
-    </div>
-  </form>
-</template>
-
-<style scoped>
-.task-form {
-  margin-bottom: 2rem;
-}
-
-.input-group {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.task-input, .time-input {
-  flex: 1;
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1rem;
-}
-
-.add-btn {
-  background: var(--primary);
-  color: white;
-  border: none;
-  padding: 0 1.5rem;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.add-btn:hover {
-  background: #33a06f;
-}
-</style>
-Step 4: Enhanced TaskList.vue (With Animations)
-vue
-<template>
-  <transition-group name="fade" tag="ul" class="task-list">
-    <li v-for="(task, index) in tasks" :key="index" class="task-item">
-      <div class="task-content">
-        <input 
-          type="checkbox" 
-          v-model="task.completed" 
-          class="task-checkbox"
-        />
-        <span :class="{ completed: task.completed }">{{ task.text }}</span>
-        <div v-if="task.alarmTime" class="alarm-badge">
-          <i class="fas fa-bell"></i> {{ formatAlarmTime(task.alarmTime) }}
-        </div>
-      </div>
-      <button @click="deleteTask(index)" class="delete-btn">
-        <i class="fas fa-trash"></i>
-      </button>
-    </li>
-  </transition-group>
-</template>
-
-<style scoped>
-.task-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.task-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
-  margin-bottom: 0.5rem;
-  background: var(--card-bg);
-  border-radius: 4px;
-  box-shadow: var(--shadow);
-  transition: all 0.3s ease;
-}
-
-.task-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.task-content {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex: 1;
-}
-
-.completed {
-  text-decoration: line-through;
-  opacity: 0.7;
-}
-
-.alarm-badge {
-  font-size: 0.8rem;
-  background: #fff3bf;
-  color: #5c3c00;
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.delete-btn {
-  background: #ff6b6b;
-  color: white;
-  border: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.delete-btn:hover {
-  background: #ff5252;
-}
-
-/* Animations */
-.fade-enter-active, .fade-leave-active {
-  transition: all 0.5s ease;
-}
-.fade-enter-from, .fade-leave-to {
-  opacity: 0;
-  transform: translateX(30px);
-}
-body {
-  font-family:sans-serif;
-  margin : 20px;
-}
-h1{
-  text-align: center;
-}
-input[type="text"] {
-  padding:8px;
-  margin-right:8px;
-  width:calc(100% - 100px);
-}
-.completed {
-  text-decoration: line-through;
-  color: grey;
-}
-
-li {
-  list-style: none;
-  padding: 5px 0;
-  display: flex;
-  align-items: center;
-}
-
-li span {
-  flex-grow: 1;
-  margin: 0 10px;
-}
-</style>
-
-
 

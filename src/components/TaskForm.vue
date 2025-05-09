@@ -12,6 +12,12 @@
           class="time-input"
           :min="new Date().toISOString().slice(0, 16)"
         />
+        <input 
+           type="email"
+           v-model="userEmail"
+           placeholder="Email for Reminder"
+         :min="new Date().toISOString().slice(0, 16)"
+        />
         <button type="submit" class="add-btn">
           <i class="fas fa-plus"></i> Add Task
         </button>
@@ -57,17 +63,22 @@ export default {
         return {
             newTask: "",
             alarmTime: "",
+            userEmail: "",
         };
     },
     methods: {
         addTask() {
+            if (this.newTask.trim() === "") return;
             this.$emit("add-task", {
+                id: Date.now().toString(),
                 text: this.newTask,
                 alarmTime: this.alarmTime,
                 completed:false,
+                userEmail: this.userEmail,
             });
             this.newTask = "";
             this.alarmTime = null;
+            this.userEmail= ""
         },
     },
 };
