@@ -34,6 +34,27 @@ const showBrowserNotification = (taskTest) =>{
     });
   }
 };
+const triggerEmailNotification = (task) => {
+  if (task.userEmail) {
+    console.log('EMAIL_NOTIFICATION_TODO:Send email to ${task.userEmail} for task:"${task.text}" at ${new Date(task.alarmTime).toLocaleString()}');
+  };
+}
+const scheduleAlarm = (task) => {
+  if(!task.id || !task.alarmTime) return;
+  cancelAlarm(task.id);
+  const alarmDate = new Date(task.alarmTime);
+  const now = new Date();
+  const delay = alarmDate - now;
+
+  if (delay > 0) {
+    const timeoutid = setTimeout(() => {
+      showBrowserNotification(task.text);
+      triggerEmailNotification(task);
+      activeAlarmTimeouts.value.delete(task.id)
+    },delay);
+    activeAlarmTimeouts.value.set(task.id,timeoutid);
+  }
+};
 const tasks = ref(JSON.parse(localStorage.getItem('tasks')) || []);
 watchEffect(() => {
   localStorage.setItem("tasks", JSON.stringify(tasks.value));
