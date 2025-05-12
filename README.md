@@ -1,7 +1,7 @@
 
 # Riaor Reminder
 
-Riaor Reminder is a comprehensive web-based productivity tool designed to help users manage their tasks and notes effectively. It features a dynamic to-do list with capabilities for adding, editing, and deleting tasks, as well as filtering them by status (all, active, completed). Users can set specific alarm times for tasks, triggering browser notifications and placeholder email reminders to ensure deadlines are met.
+Riaor Reminder is a  web-based productivity tool designed to help users manage their tasks and notes effectively. It features a dynamic to-do list with capabilities for adding, editing, and deleting tasks, as well as filtering them by status (all, active, completed). Users can set specific alarm times for tasks, triggering browser notifications and placeholder email reminders to ensure deadlines are met.
 
 The application also includes a flexible sticky notes section, allowing users to create, update, and delete virtual notes with customizable background colors for visual organization. To enhance user experience, Riaor Reminder incorporates a theme toggle for switching between light and dark modes, and a visually engaging animated particle background. All tasks and sticky notes are persistently stored in the browser's local storage, ensuring data is retained between sessions."
 
