@@ -21,26 +21,64 @@ const requestNotificationPermission = () => {
   }
 };
 const showBrowserNotification = (taskText) =>{
-  if ('Notification' in window && Notification.permission === 'granted'){
-    new Notification ("Task Reminder",{body: taskText});
-  }else if('Notification' in window && Notification.permission !== 'denied'){
-    Notification.requestPermission().then(permission => {
-      if (permission === 'granted') {
-        new Notification("Task reminder",{body:taskText});
+  console.log("[showBrowserNotification] Attempting to show notification",taskText);
+  if (!('Notification' in window)){
+    console.error("[showBrowserNotification] Browser does not support notifications");
+    return;
+  }
+    if(Notification.permission === 'granted'){
+    try {
+      const notificationOptions = {
+        body: taskText,
+        tag : `task-reminder-${taskText.replace(/\s+/g,'-')}-${Date.now()}`, // Unique tag for testing
+        requireInteraction: true,
+      };
+      console.log("[showBrowserNotification] Creating notification with options:", notificationOptions);
+        const notification = new Notification("Task Reminder", notificationOptions);
+        
+        notification.onclick = () => {
+          console.log("[showBrowserNotification] Notification clicked.");
+          window.focus();
+        };
+        notification.onerror = (err) => {
+          console.error("[showBrowserNotification] Notification error:", err);
+        };
+        notification.onshow = () => {
+          // Note: 'onshow' is not universally supported by all browsers for Notification instances.
+          console.log("[showBrowserNotification] Notification shown (or attempted to be shown).");
+        };
+        notification.onclose = () => {
+          console.log("[showBrowserNotification] Notification closed.");
+        };
+    } catch (error) {
+      console.error("[showBrowserNotification] Error creating notification:", error);
+    }
+  } else if (Notification.permission !== 'denied') {
+    console.log("[showBrowserNotification] Requesting notification permission...");
+    Notification.requestPermission().then(permissionResult => { // Renamed 'permission' to 'permissionResult' to avoid conflict
+      console.log("[showBrowserNotification] Permission request result:", permissionResult);
+      if (permissionResult === 'granted') {
+        showBrowserNotification(taskText); // Call again to show notification now that permission is granted
+      } else {
+        console.warn("[showBrowserNotification] Notification permission denied after request.");
       }
+    }).catch(err => {
+      console.error("[showBrowserNotification] Error requesting permission:", err);
     });
+  } else {
+    console.warn("[showBrowserNotification] Notification permission is denied. Cannot show notification.");
   }
 };
 const triggerEmailNotification = (task) => {
   if (task.userEmail) {
-    console.log('EMAIL_NOTIFICATION_TODO:Send email to ${task.userEmail} for task:"${task.text}" at ${new Date(task.alarmTime).toLocaleString()}');
+    console.log(`EMAIL_NOTIFICATION_TODO:Send email to ${task.userEmail} for task:"${task.text}" at ${new Date(task.alarmTime).toLocaleString()}`);
   };
 }
 const cancelAlarm = (taskId) => {
   if (activeAlarmTimeouts.value.has(taskId)) {
     clearTimeout(activeAlarmTimeouts.value.get(taskId));
     activeAlarmTimeouts.value.delete(taskId);
-    console.log('Cancelled alarm for task ID: ${taskId}');
+    console.log(`Cancelled alarm for task ID: ${taskId}`);
   }
 };
 
@@ -56,7 +94,7 @@ const scheduleAlarm = (task) => {
       showBrowserNotification(task.text);
       triggerEmailNotification(task);
       activeAlarmTimeouts.value.delete(task.id);
-      console.log('Alarm triggered for task: ${task.text}');
+      console.log(`Alarm triggered for task: ${task.text}`);
     },delay);
     activeAlarmTimeouts.value.set(task.id,timeoutid);
   }
@@ -102,7 +140,6 @@ watchEffect(() => {
 
 const handleAddTask = (taskData) => {
   const newTask = { ...taskData, id:Date.now() + Math.random().toString(36).substr(2,9) };
-  scheduleAlarm(newTask);
   tasks.value.push(newTask);
   if (newTask.alarmTime) {
     scheduleAlarm(newTask);
@@ -188,11 +225,13 @@ const deleteNote = (index) => {
       <TaskForm @add-task="handleAddTask"/>
       
       <ul>
-        <li v-for ="(task,index) in filteredTasksForInlineList" :key="task.id" >
-          <input type="checkbox" v-model="task.completed" />
-          <span :class="{completed: task.completed}">{{ task.text }}</span>
-          <button @click="handleDeleteTask(task.id)">Delete</button>
-          <button @click="editTask(index)">Edit</button>
+        <li v-for ="(task,index) in filteredTasksForInlineList" :key="task.id" class="inline-task-item" >
+          <input type="checkbox" v-model="task.completed" class="task-checkbox-inline" />
+          <span :class="{completed: task.completed}" class="task-text-inline">{{ task.text }}</span>
+          <div class="task-actions-inline">
+            <button @click="editTask(index)" class="edit-btn-inline">Edit</button>
+            <button @click="handleDeleteTask(task.id)" class="delete-btn-inline">Delete</button>
+          </div>
         </li>
       </ul>
       <div class="task-tabs">
@@ -240,12 +279,12 @@ const deleteNote = (index) => {
   --text-color: #333333;
   --button-text-color:white;
   --card-bg: #ffffff;
-  --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --shadow: 0 2px 8px rgba(146, 138, 138, 0.1);
 }
 html.dark {
     --primary: #42d392;
     --card-bg: #2d2d2d;
-    --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow: 0 2px 8px rgba(149, 140, 140, 0.3);
     --button-text-color:#212121;
   }
 #app {
@@ -268,13 +307,13 @@ header{
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0 20px;
+  margin-bottom: 20px;
 }
 header h1 {
   color:var(--text-color);
   justify-content:space-between;
   align-items:center;
-  margin-bottom:0 20px;
+  margin-bottom:20px;
 }
 .task-text-input, .task-date-input {
   padding: 10px;
@@ -328,6 +367,39 @@ header h1 {
   color:var(--text-color);
   cursor: pointer;
   font-size: 1.2rem;
+}
+.inline-task-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Distributes space */
+  padding: 10px 15px;
+  margin-bottom: 10px;
+  background-color: var(--card-bg);
+  border-radius: 4px;
+  box-shadow: var(--shadow);
+}
+
+.task-checkbox-inline {
+  margin-right: 10px;
+}
+
+.task-text-inline {
+  flex-grow: 1; /* Allows text to take available space */
+  margin-right: 10px; /* Space before action buttons */
+}
+
+.task-actions-inline {
+  display: flex;
+  gap: 8px;
+}
+
+.edit-btn-inline,
+.delete-btn-inline {
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+ 
 }
 </style>
 

@@ -19,10 +19,10 @@
 
 html.dark { /* This class will be toggled by JavaScript on the <html> element */
   --text-color: rgba(255, 255, 255, 0.87);
-  --background-color: #242424;
+  --background-color: #685858;
   --link-color: #646cff; /* Original dark link color */
   --link-hover-color: #535bf2; /* Original dark link hover */
-  --button-bg-color: #1a1a1a;
+  --button-bg-color: #434040;
   --button-text-color: rgba(255, 255, 255, 0.87);
   --completed-text-color: lightgray; /* Adjusted for dark theme */
 
@@ -64,12 +64,12 @@ ul{
 
 button {
   border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
+  border: 2px solid transparent;
+  padding: 0.75rem 1.5rem 1.2em;
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: #6ab5c5;
   cursor: pointer;
   transition: border-color 0.25s;
 }

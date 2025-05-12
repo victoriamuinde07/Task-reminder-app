@@ -86,7 +86,7 @@
 }
 
 .delete-btn {
-  background: #ff6b6b;
+  background: #e31c1c;
   color: white;
   border: none;
   width: 32px;
