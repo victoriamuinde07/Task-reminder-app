@@ -3,6 +3,7 @@ import {ref,computed,watchEffect,onMounted} from 'vue';
 import TaskForm from "./components/TaskForm.vue";
 import TaskList from "./components/TaskList.vue";
 import StickyNote from "./components/StickyNote.vue";
+import ParticlesBackground from "./components/ParticlesBackground.vue";
 
 
 const theme = ref(localStorage.getItem("theme") || "light");
@@ -143,6 +144,7 @@ const deleteNote = (index) => {
 
 <template>
   <div id="app" :class="theme">
+    <ParticlesBackground />
     <div class="container">
       <header>
         <h1> ⏰ Riaor Reminder</h1>

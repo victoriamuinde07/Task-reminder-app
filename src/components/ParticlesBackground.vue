@@ -2,7 +2,9 @@
     <div id="particles-js" class="particles-container"></div>
 </template>
 <script>
-import particlesJS from 'particlesjs'
+import 'particles.js';
+
+particlesJS.load('particles.js',{/* config */});
 
 export default{ 
     mounted() {
@@ -10,7 +12,7 @@ export default{
     },
     methods: {
         initParticles() {
-            particlesJS.load('particles-js',{
+            window.particlesJS('particles-js',{
                 particles: {
                     number : {value:80,density: {enable:true,value_area:800}},
                     color : { value: "#42b983"},
