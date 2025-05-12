@@ -12,54 +12,32 @@
                     <i class="fas fa-bell"></i> {{ formatAlarmTime(task.alarmTime) }}
                 </div>
             </div>
-            <button @click="deleteTask(index)" class="delete-btn">
+            <button @click="deleteTask(task.id)" class="delete-btn">
                 <i class="fas fa-trash"></i>
             </button>
         </li>
     </transition-group>
     
-    
   </template>
   
-  <script>
+<script>
   export default {
-    props: ["tasks"],
+    props: {
+      tasks: {
+        type: Array,
+        required: true,
+      },
+    },
     methods: {
-      deleteTask(index) {
-        this.$emit("delete-task", index);
+      deleteTask(taskId) {
+        this.$emit("delete-task", taskId);
       },
       formatAlarmTime(time) {
         return new Date(time).toLocaleString();
       },
-      setAlarm(task) {
-        if (!task.alarmTime) return;
-  
-        const now = new Date();
-        const alarmDate = new Date(task.alarmTime);
-        const timeout = alarmDate - now;
-  
-        if (timeout > 0) {
-          setTimeout(() => {
-            this.showNotification(task.text);
-          }, timeout);
-        }
-      },
-      showNotification(taskText) {
-        if ("Notification" in window && Notification.permission === "granted") {
-          new Notification("⏰ Task Reminder", { body: taskText });
-        }
-      },
-    },
-    mounted() {
-      // Request notification permission
-      if ("Notification" in window) {
-        Notification.requestPermission();
-      }
-      // Set alarms for existing tasks
-      this.tasks.forEach(this.setAlarm);
     },
   };
-  </script>
+</script>
   <style scoped>
   .task-list {
   list-style: none;

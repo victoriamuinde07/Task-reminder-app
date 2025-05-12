@@ -1,10 +1,9 @@
 <template>
-    <div id="particles-js" class="particles-container"></div>
+    <div id="particles-js" class="particles-background"></div>
 </template>
 <script>
 import 'particles.js';
 
-particlesJS.load('particles.js',{/* config */});
 
 export default{ 
     mounted() {
@@ -34,7 +33,7 @@ export default{
 </script>
 
 <style scoped> 
-.particles-container {
+.particles-background {
     position : fixed;
     top : 0;
     left : 0;

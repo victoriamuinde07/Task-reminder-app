@@ -6,11 +6,7 @@ import StickyNote from "./components/StickyNote.vue";
 import ParticlesBackground from "./components/ParticlesBackground.vue";
 
 
-const theme = ref(localStorage.getItem("theme") || "light");
-const toggleTheme = () => {
-  theme.value = theme.value === "light" ? "dark" : "light";
-  localStorage.setItem("theme", theme.value);
-};
+
 const activeAlarmTimeouts = ref(new Map());
 const requestNotificationPermission = () => {
   if('Notification' in window) {
@@ -24,9 +20,9 @@ const requestNotificationPermission = () => {
     });
   }
 };
-const showBrowserNotification = (taskTest) =>{
+const showBrowserNotification = (taskText) =>{
   if ('Notification' in window && Notification.permission === 'granted'){
-    new Notification ("Task Reminder",{body: taskTest});
+    new Notification ("Task Reminder",{body: taskText});
   }else if('Notification' in window && Notification.permission !== 'denied'){
     Notification.requestPermission().then(permission => {
       if (permission === 'granted') {
@@ -40,6 +36,14 @@ const triggerEmailNotification = (task) => {
     console.log('EMAIL_NOTIFICATION_TODO:Send email to ${task.userEmail} for task:"${task.text}" at ${new Date(task.alarmTime).toLocaleString()}');
   };
 }
+const cancelAlarm = (taskId) => {
+  if (activeAlarmTimeouts.value.has(taskId)) {
+    clearTimeout(activeAlarmTimeouts.value.get(taskId));
+    activeAlarmTimeouts.value.delete(taskId);
+    console.log('Cancelled alarm for task ID: ${taskId}');
+  }
+};
+
 const scheduleAlarm = (task) => {
   if(!task.id || !task.alarmTime) return;
   cancelAlarm(task.id);
@@ -51,39 +55,68 @@ const scheduleAlarm = (task) => {
     const timeoutid = setTimeout(() => {
       showBrowserNotification(task.text);
       triggerEmailNotification(task);
-      activeAlarmTimeouts.value.delete(task.id)
+      activeAlarmTimeouts.value.delete(task.id);
+      console.log('Alarm triggered for task: ${task.text}');
     },delay);
     activeAlarmTimeouts.value.set(task.id,timeoutid);
   }
 };
+const theme = ref('light');
+const applyThemePreference = (newTheme) => {
+  const htmlEl = document.documentElement;
+  if(newTheme === 'dark') {
+    htmlEl.classList.add('dark');
+  }else{
+    htmlEl.classList.remove('dark');
+  }
+  localStorage.setItem('theme',newTheme);
+  theme.value = newTheme;
+};
+const toggleTheme = () => {
+  const newTheme = theme.value === 'light' ? 'dark' : 'light';
+    applyThemePreference(newTheme);
+};
+onMounted(() => {
+  const savedTheme = localStorage.getItem('theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  if (savedTheme) {
+    applyThemePreference(savedTheme);
+  }else if (prefersDark) {
+    applyThemePreference('dark');
+  }else{
+    applyThemePreference('light');
+  };
+
+  requestNotificationPermission();
+  tasks.value.forEach(task => {
+    if (task.alarmTime)
+      scheduleAlarm(task);
+  });
+});
+  
+
 const tasks = ref(JSON.parse(localStorage.getItem('tasks')) || []);
 watchEffect(() => {
   localStorage.setItem("tasks", JSON.stringify(tasks.value));
 });
 
 const handleAddTask = (taskData) => {
-  tasks.value.push(taskData);
+  const newTask = { ...taskData, id:Date.now() + Math.random().toString(36).substr(2,9) };
+  scheduleAlarm(newTask);
+  tasks.value.push(newTask);
+  if (newTask.alarmTime) {
+    scheduleAlarm(newTask);
+   }
 };
 
-const handleDeleteTask = (index) => {
-  tasks.value.splice(index, 1);
+const handleDeleteTask = (taskId) => {
+  const index = tasks.value.findIndex(t => t.id === taskId);
+  if (index !== -1) {
+    cancelAlarm(taskId); // Cancel any pending alarm for this task
+    tasks.value.splice(index, 1);
+  }
 };
-const newTask = ref('');
-const taskDate = ref('');
-const addInlineTask = () => {
-  if (newTask.value.trim() === '') return;
-  tasks.value.push({
-    text: newTask.value,
-    date: taskDate.value,
-    completed: false,
-    alarmTime: null,
-  });
-  newTask.value = '';
-  taskDate.value = '';
-};
-const deleteInlineTask = (index) => {
-  tasks.value.splice(index, 1);
-};
+
 const editTask = (index) => {
   const taskToEdit = filteredTasksForInlineList.value[index];
   const originalTaskIndex = tasks.value.findIndex(t => t === taskToEdit);
@@ -99,11 +132,7 @@ const editTask = (index) => {
 const currentTab = ref('all'); 
 const TABS = ['all','active','completed'];
 
-const filteredTasks = computed(() => { 
-  if (currentTab.value === 'active') return tasks.value.filter(t => !t.completed);
-  if (currentTab.value === 'completed') return tasks.value.filter(t => t.completed);
-  return tasks.value;
-});
+
 const filteredTasksForInlineList = computed(() => {
   if (currentTab.value === 'active') return tasks.value.filter(t => !t.completed);
   if (currentTab.value === 'completed') return tasks.value.filter(t => t.completed);
@@ -128,7 +157,11 @@ const getRandomColor = () => {
 };
 
 const addStickyNote = () => {
-  stickyNotes.value.push({ text: '', color: getRandomColor() });
+  stickyNotes.value.push({ 
+    id: Date.now()+ Math.random().toString(36).substr(2,9) + '_note',
+    text:'', 
+    color: getRandomColor()
+   });
 };
 
 const updateNote = (index, text) => {
@@ -143,11 +176,11 @@ const deleteNote = (index) => {
 </script>
 
 <template>
-  <div id="app" :class="theme">
+  <div id="app">
     <ParticlesBackground />
     <div class="container">
       <header>
-        <h1> ⏰ Riaor Reminder</h1>
+        <h1>Riaor Reminder</h1>
           <button @click="toggleTheme" class="theme-toggle">
             <i :class="theme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon'"></i>
           </button>
@@ -155,10 +188,10 @@ const deleteNote = (index) => {
       <TaskForm @add-task="handleAddTask"/>
       
       <ul>
-        <li v-for ="(task,index) in filteredTasksForInlineList" :key="task.id || index">
+        <li v-for ="(task,index) in filteredTasksForInlineList" :key="task.id" >
           <input type="checkbox" v-model="task.completed" />
           <span :class="{completed: task.completed}">{{ task.text }}</span>
-          <button @click="deleteInlineTask(index)">Delete</button>
+          <button @click="handleDeleteTask(task.id)">Delete</button>
           <button @click="editTask(index)">Edit</button>
         </li>
       </ul>
@@ -174,7 +207,7 @@ const deleteNote = (index) => {
       </div>
       <TaskList 
       v-if="tasks.length > 0 "
-        :tasks="filteredTasks"
+        :tasks="filteredTasksForInlineList"
         @delete-task="handleDeleteTask"
         @toggle-complete="toggleComplete"
       />
@@ -184,7 +217,7 @@ const deleteNote = (index) => {
           <div class="sticky-notes-container">
             <StickyNote 
           v-for="(note, index) in stickyNotes" 
-          :key="index"
+          :key="note.id"
           :note="note"
           @update-note="updateNote(index, $event)"
           @delete-note="deleteNote(index)"
@@ -201,28 +234,28 @@ const deleteNote = (index) => {
 
 <style scoped>
 :root {
+  --font-family:'Arial',sans-serif;
   --primary: #42b983;
-  --bg: #f9f9f9;
-  --text: #dae7f5ed;
+  --background-color: #f9f9f9;
+  --text-color: #333333;
+  --button-text-color:white;
   --card-bg: #ffffff;
   --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
-
-.dark {
-  --primary: #42d392;
-  --bg: #b2f2f3;
-  --text: #ffffff;
-  --card-bg: #2d2d2d;
-  --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
+html.dark {
+    --primary: #42d392;
+    --card-bg: #2d2d2d;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --button-text-color:#212121;
+  }
 #app {
   max-width: 800px;
-  max-height:100vh;
+  min-height:100vh;
   margin: 0 auto;
-  background:rgb(37, 64, 72);
+  background: transparent;
   padding: 30px;
-  font-family: 'Arial',sans-serif;
+  font-family: var(--font-family);
+  color: var(--text-color);
 }
 
 .container {
@@ -231,12 +264,17 @@ const deleteNote = (index) => {
   padding: 2rem;
 }
 
-header h1 {
+header{
   display: flex;
-  color:rgb(72, 96, 133);
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 0 20px;
+}
+header h1 {
+  color:var(--text-color);
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:0 20px;
 }
 .task-text-input, .task-date-input {
   padding: 10px;
@@ -252,7 +290,8 @@ header h1 {
 
 .task-tabs button {
   padding: 8px 15px;
-  background: #06070a;
+  background: var(--card-bg);
+  color: var(--text-color);
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -279,14 +318,14 @@ header h1 {
 }
 
 .task-tabs button.active {
-  background: #42b983;
-  color: white;
+  background:var(--primary);
+  color: var(--button-text-color);
 }
 
 .theme-toggle {
-  background:#1a1a1a;
+  background:var(--card-bg);
   border: none;
-  color:rgb(187, 241, 224);
+  color:var(--text-color);
   cursor: pointer;
   font-size: 1.2rem;
 }
